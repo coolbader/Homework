@@ -1,9 +1,5 @@
 using Homework;
-using Homework.Cusomer;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
 
 namespace Customer
 {

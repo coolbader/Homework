@@ -3,7 +3,7 @@ using System;
 using System.Collections.Immutable;
 using System.Reflection.Metadata.Ecma335;
 
-namespace Homework.Cusomer
+namespace Homework
 {
     public class CustomerDataComparer :  IComparer<CustomerData>
     {

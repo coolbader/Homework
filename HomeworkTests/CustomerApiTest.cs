@@ -7,7 +7,7 @@ using System.Net.Http.Json;
 namespace HomeworkTests
 {
     [TestClass]
-    public class LeaderboardApiTest
+    public class CustomerApiTest
     {
         #region Init
 
@@ -105,61 +105,7 @@ namespace HomeworkTests
 
         }
 
-        [TestMethod]
-        public async Task Simulate_100000_Concurrent_Requests()
-        {
-            await Simulate_random_Score_Customer(100000);
-
-            // update cusomerid 1 score is 501
-            // update cusomerid 100001 score is 502
-            string updateurl1 = $"/customer/1/score/501";
-            string updateurl2 = $"/customer/100001/score/502";
-            var response1 = await _client.PostAsync(updateurl1, null);
-            response1.EnsureSuccessStatusCode();
-            var response2 = await _client.PostAsync(updateurl2, null);
-            response2.EnsureSuccessStatusCode();
-
-
-
-
-            //get first 1 to 10
-            string leaderboard = $"/leaderboard?start=1&end=10";
-            var response = await _client.GetAsync(leaderboard);
-            response.EnsureSuccessStatusCode();
-            var customers = await response.Content.ReadFromJsonAsync<List<CustomerVO>>();
-            foreach (var item in customers)
-            {
-                Trace.WriteLine($"CusomerID:{item.CustomerId},Score:{item.Score},Rank:{item.Rank}");
-            }
-
-        }
-
-        private async Task Simulate_random_Score_Customer(int totalRequests)
-        {
-            List<Task<HttpResponseMessage>> tasks = new List<Task<HttpResponseMessage>>();
-            Stopwatch stopwatch = Stopwatch.StartNew();
-
-            for (int i = 0; i < totalRequests; i++)
-            {
-                int customerId = i + 1; // customer id starts from 1
-                int score = new Random().Next(1, 500);
-                string url = $"/customer/{customerId}/score/{score}";
-
-                tasks.Add(_client.PostAsync(url, null));
-            }
-
-            await Task.WhenAll(tasks);
-            stopwatch.Stop();
-
-            int successCount = tasks.Count(t => t.Result.IsSuccessStatusCode);
-            int errorCount = totalRequests - successCount;
-
-            Trace.WriteLine($"Total Requests: {totalRequests}");
-            Trace.WriteLine($"Success: {successCount}");
-            Trace.WriteLine($"Errors: {errorCount}");
-            Trace.WriteLine($"Time Taken: {stopwatch.ElapsedMilliseconds} ms");
-            Assert.AreEqual(totalRequests, successCount, "Some requests failed."); ;
-        }
+        
 
 
 

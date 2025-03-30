@@ -1,5 +1,4 @@
 using Homework;
-using Homework.Cusomer;
 using System.Collections.Concurrent;
 namespace Customer;
 /// <summary>
@@ -12,90 +11,71 @@ namespace Customer;
 /// 实际测试10001条数据预计要3秒。
 /// 总结：延迟重建索引，比如每隔5秒更新排行，但与需求不符。
 /// </summary>
-[Obsolete]
-public class CustomerObsoleteService
+
+public class CustomerObsoleteService 
 {
     /// <summary>
     /// 用于存储所有客户<客户ID，客户数据>
     /// </summary>
     private readonly ConcurrentDictionary<long, CustomerData> _customers = new();
-    /// <summary>
-    /// 使用红黑树用于存储客户排名,仅作为计算排名使用。
-    /// 1.使用 SortedSet 是为了对客户得分进行排序。
-    /// 2.排名索引得到排名数据，在_customers中得到实际的数据。
-    /// </summary>
-    private readonly SortedSet<CustomerData> _rankedCustomers = new SortedSet<CustomerData>(new CustomerDataComparer());
 
-    private List<CustomerData> _cusomerIndex = new();
+    private readonly CustomerRankManager _rankedCustomers = new CustomerRankManager();
+    ///// <summary>
+    ///// 排行榜缓存
+    ///// </summary>
+    //private List<CustomerData> _cusomerIndex = new();
     private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
-    public CustomerData UpdateScore(long customerId, decimal score)
+
+    public CustomerVO UpdateScore(long customerId, decimal score)
     {
         if (score < -1000 || score > 1000)
         {
             throw new ArgumentException("Score must be between -1000 and 1000");
         }
-
+        CustomerData resultcustomer = null;
+        int rankIndex = 0;
         _rwLock.EnterUpgradeableReadLock();
         try
         {
             if (_customers.TryGetValue(customerId, out var existingCustomer))
             {
-                _rwLock.EnterReadLock();
+                _rwLock.EnterWriteLock();
                 try
                 {
                     var updated = new CustomerData(customerId, existingCustomer.Score + score);
-                    if (_rankedCustomers.Remove(existingCustomer))
+                    if (_rankedCustomers.RemoveCustomer(existingCustomer))
                     {
-                        _rankedCustomers.Add(updated);
+                        _rankedCustomers.AddCustomer(updated);
                         _customers.TryUpdate(customerId, updated, existingCustomer);
-                        return updated;
+                        rankIndex = _rankedCustomers.GetRank(updated);
+                        resultcustomer = updated;
                     }
-                    return existingCustomer;
+
                 }
                 finally { _rwLock.ExitWriteLock(); }
             }
             else
             {
-                _rwLock.EnterReadLock();
+                _rwLock.EnterWriteLock();
                 try
                 {
                     var newCustomer = new CustomerData(customerId, score);
                     _customers.TryAdd(customerId, newCustomer);
-                    UpdateRanksAndRtnRank(newCustomer);
-                    return newCustomer;
+                    _rankedCustomers.AddCustomer(newCustomer);
+                    rankIndex = _rankedCustomers.GetRank(newCustomer);
+                    resultcustomer = newCustomer;
                 }
                 finally
                 {
 
-                    _rwLock.ExitReadLock();
+                    _rwLock.ExitWriteLock();
                 }
             }
         }
         finally { _rwLock.ExitUpgradeableReadLock(); }
-    }
-    /// <summary>
-    /// 1.添加新客户到排名列表
-    /// 2.排名=排名列表索引+1
-    /// 线程不安全，需要在调用处加锁
-    /// </summary>
-    /// <param name="customer"></param>
-    /// <returns></returns>
-    private void UpdateRanksAndRtnRank(CustomerData customer)
-    {
-        // 移除旧排名
-        if (_customers.TryGetValue(customer.CustomerId, out var existingCustomer))
-        {
-            _rankedCustomers.Remove(existingCustomer);
-        }
-        // 添加进进去，重新计算排名
-        _rankedCustomers.Add(customer);
-        RebuildIndex();
+        return new CustomerVO(resultcustomer, rankIndex + 1);
     }
 
-    private void RebuildIndex()
-    {
-        _cusomerIndex = _rankedCustomers.ToList();
-    }
 
 
 
@@ -107,7 +87,7 @@ public class CustomerObsoleteService
     /// <param name="end">结束排名，如果存在则包含在响应中</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public List<CustomerData> GetCustomersByRank(int start, int end)
+    public List<CustomerVO> GetCustomersByRank(int start, int end)
     {
         _rwLock.EnterReadLock();
         try
@@ -117,23 +97,25 @@ public class CustomerObsoleteService
                 throw new ArgumentException("Invalid rank range");
             }
 
-            var result = new List<CustomerData>();
+            var result = new List<CustomerVO>();
             for (int rank = start; rank <= end; rank++)
             {
-                if (_cusomerIndex.Count < rank)
+                if (_rankedCustomers.Count < rank)
                 {
                     break;
                 }
-                _cusomerIndex[rank - 1].Rank = _rankedCustomers.GetSortedSetIndex(_cusomerIndex[rank - 1]) + 1;
-                result.Add(_cusomerIndex[rank - 1]);
+                var customer = _rankedCustomers.GetIndex(rank - 1);
+                var customervo = new CustomerVO(customer, rank);
+                result.Add(customervo);
             }
             return result;
         }
         finally { _rwLock.ExitReadLock(); }
     }
 
-    public List<CustomerData> GetCustomersAroundCustomer(long customerId, int high, int low)
+    public List<CustomerVO> GetCustomersAroundCustomer(long customerId, int high, int low)
     {
+        var result = new List<CustomerVO>();
         _rwLock.EnterReadLock();
         try
         {
@@ -141,39 +123,57 @@ public class CustomerObsoleteService
             {
                 throw new KeyNotFoundException($"CustomerData {customerId} not found");
             }
-            var result = new List<CustomerData>();
-            targetCustomer.Rank = _rankedCustomers.GetSortedSetIndex(targetCustomer) + 1;
-            if (low > 0)
-            {
-                for (int i = 1; i <= low; i++)
-                {
-                    var lowindex = targetCustomer.Rank - 1 - i;
-                    if (lowindex >= 0)
-                    {
-                        _cusomerIndex[lowindex].Rank = _rankedCustomers.GetSortedSetIndex(_cusomerIndex[lowindex]) + 1;
-                        result.Add(_cusomerIndex[lowindex]);
-                    }
 
-                }
-            }
-
-            result.Add(targetCustomer);
+            var rankindex = _rankedCustomers.GetRank(targetCustomer);
             if (high > 0)
             {
                 for (int i = 1; i <= high; i++)
                 {
-                    var highindex = targetCustomer.Rank - 1 + i;
-                    if (highindex <= _cusomerIndex.Count)
+                    var highindex = rankindex - i;
+                    if (highindex < 0)
                     {
-                        _cusomerIndex[highindex].Rank = _rankedCustomers.GetSortedSetIndex(_cusomerIndex[highindex]) + 1;
-                        result.Add(_cusomerIndex[highindex]);
+                        break;
                     }
+
+                    var highrankCustomer = _rankedCustomers.GetIndex(highindex);
+                    var highcustomer = new CustomerVO(highrankCustomer, highindex + 1);
+                    result.Add(highcustomer);
+
                 }
             }
-            return result;
+            var nowcustomer = new CustomerVO(targetCustomer, rankindex + 1);
+            result.Add(nowcustomer);
+            if (low > 0)
+            {
+                for (int i = 1; i <= low; i++)
+                {
+                    var lowindex = rankindex + i;
+                    if (lowindex > _rankedCustomers.Count)
+                    {
+                        break;
+                    }
+
+                    var lowrankCustomer = _rankedCustomers.GetIndex(lowindex);
+                    var lowcustomer = new CustomerVO(lowrankCustomer, lowindex + 1);
+                    result.Add(lowcustomer);
+
+
+                }
+            }
 
         }
         finally { _rwLock.ExitReadLock(); }
+        return result;
+    }
+
+    public int GetCustomerCount()
+    {
+        return _rankedCustomers.Count;
+    }
+
+    public List<CustomerData> GetTheSame()
+    {
+        return _rankedCustomers.GetTheSame();
     }
 }
 
