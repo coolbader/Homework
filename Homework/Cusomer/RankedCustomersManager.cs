@@ -4,7 +4,7 @@ namespace Homework
 {
     public class RankedCustomersManager
     {
-        private readonly RedBlackTree<CustomerData,CustomerIdComparer> _rankedCustomers = new RedBlackTree<CustomerData, CustomerIdComparer>();
+        private readonly RedBlackTree<CustomerData, CustomerIdComparer> _rankedCustomers = new RedBlackTree<CustomerData, CustomerIdComparer>();
 
         public void Insert(CustomerData customer)
         {
@@ -25,9 +25,17 @@ namespace Homework
         {
             return _rankedCustomers.GetByIndex(index);
         }
+
+        public bool Exist(CustomerData customerIdToSearch)
+        {
+            var foundNode = _rankedCustomers.Search(customerIdToSearch);
+            if (foundNode != null) { return true; }
+            else { return false; }
+        }
+
         public void BatchSave(IEnumerable<CustomerData> datas)
         {
-             _rankedCustomers.BatchSave(datas);
+            _rankedCustomers.BatchSave(datas);
         }
         public int Count => _rankedCustomers.Count;
     }

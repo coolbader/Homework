@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Homework
 {
@@ -176,6 +177,30 @@ namespace Homework
         internal int? GetRankCount()
         {
             return _rankedCustomersManager.Count;
+        }
+
+        internal string DataAccuracy()
+        {
+            StringBuilder result = new StringBuilder();
+            if (_customers.Count == _rankedCustomersManager.Count)
+            {
+                result.AppendLine($"customersCount=RankCount -{_customers.Count}-{_rankedCustomersManager.Count}");
+            }
+            else
+            {
+                result.AppendLine($"customersCount<>RankCount -{_customers.Count}-{_rankedCustomersManager.Count}");
+            }
+            foreach (var customer in _customers) {
+                if (_rankedCustomersManager.Exist(customer.Value))
+                {
+                    result.AppendLine($"Exist {customer.Value.CustomerId},score:{customer.Value.Score}");
+                }
+                else
+                {
+                    result.AppendLine($"-------------Not Exist {customer.Value.CustomerId},score:{customer.Value.Score}");
+                }
+            }
+            return result.ToString();
         }
     }
 }

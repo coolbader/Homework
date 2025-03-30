@@ -90,6 +90,18 @@ public class Program
                 return Results.NotFound();
             }
         });
+        app.MapGet("/DataAccuracy", () =>
+        {
+            try
+            {
+                var result = customerService.DataAccuracy();
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
+        });
         app.Run();
 
     }

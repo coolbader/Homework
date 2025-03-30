@@ -80,6 +80,16 @@ namespace HomeworkTests
             return customers;
         }
 
+        [TestMethod]
+        public async Task Data_Accuracy() {
+            await Simulate_Score_Customer(100001, 0);
+            string updateurl1 = $"/DataAccuracy";
+            var response1 = await _client.GetAsync(updateurl1);
+            response1.EnsureSuccessStatusCode();
+            var result = await response1.Content.ReadAsStringAsync();
+            Trace.WriteLine($"{updateurl1} {result}");
+            await Task.Delay(10);
+        }
 
         /// <summary>
         /// Test to simulate 10001 concurrent requests
@@ -113,7 +123,6 @@ namespace HomeworkTests
             {
                 Trace.WriteLine($"CusomerID:{item.CustomerId},Score:{item.Score},Rank:{item.Rank}");
             }
-
         }
 
         [TestMethod]
