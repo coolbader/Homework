@@ -1,19 +1,16 @@
-﻿using global::Customer;
-using Homework.Extentions;
-using System.Collections.Concurrent;
-using System.Threading;
+﻿using System.Collections.Concurrent;
 namespace Homework
 {
 
-    
-    public class CustomerRBTService
+
+    public class CustomerRBTService:ICustomerService
     {
         /// <summary>
         /// 用于存储所有客户<客户ID，客户数据>
         /// </summary>
         private readonly ConcurrentDictionary<long, CustomerData> _customers = new();
 
-        private readonly RedBlackTree<CustomerData> _rankedCustomers = new RedBlackTree<CustomerData>();
+        private readonly RedBlackTree<CustomerData, CustomerIdComparer> _rankedCustomers = new RedBlackTree<CustomerData, CustomerIdComparer>();
         private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
 
         public CustomerVO UpdateScore(long customerId, decimal score)
@@ -87,7 +84,7 @@ namespace Homework
                     {
                         break;
                     }
-                    var customer = _rankedCustomers.Select(rank - 1);
+                    var customer = _rankedCustomers.GetByIndex(rank - 1);
                     var customervo = new CustomerVO(customer, rank);
                     result.Add(customervo);
                 }
@@ -118,7 +115,7 @@ namespace Homework
                             break;
                         }
 
-                        var highrankCustomer = _rankedCustomers.Select(highindex);
+                        var highrankCustomer = _rankedCustomers.GetByIndex(highindex);
                         var highcustomer = new CustomerVO(highrankCustomer, highindex + 1);
                         result.Add(highcustomer);
                     }
@@ -135,7 +132,7 @@ namespace Homework
                             break;
                         }
 
-                        var lowrankCustomer = _rankedCustomers.Select(lowindex);
+                        var lowrankCustomer = _rankedCustomers.GetByIndex(lowindex);
                         var lowcustomer = new CustomerVO(lowrankCustomer, lowindex + 1);
                         result.Add(lowcustomer);
                     }
@@ -153,7 +150,7 @@ namespace Homework
         public List<CustomerData> GetTheSame()
         {
             // 这里需要实现获取相同分数客户的逻辑
-            throw new NotImplementedException();
+            return null;
         }
     }
 

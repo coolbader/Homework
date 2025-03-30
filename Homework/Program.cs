@@ -1,4 +1,5 @@
 using Customer;
+using Homework;
 
 public class Program
 {
@@ -9,7 +10,10 @@ public class Program
         //  add services to the container
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
-        builder.Services.AddSingleton(new CustomerService());
+        builder.Services.AddSingleton<CustomerService>();
+        builder.Services.AddSingleton<RankedCustomersManager>();
+        //builder.Services.AddSingleton(new CustomerSkipListService());
+        builder.Services.AddHostedService<CalcRankService>();
         //lock port to test in local.
         builder.WebHost.UseUrls("http://localhost:5000");
         var app = builder.Build();
@@ -27,8 +31,8 @@ public class Program
         {
             try
             {
-                var newScore = customerService.UpdateScore(customerid, score);
-                return Results.Ok(newScore);
+                customerService.UpdateScore(customerid, score);
+                return Results.Ok("ok");
             }
             catch (ArgumentOutOfRangeException ex)
             {
@@ -62,6 +66,30 @@ public class Program
             }
         });
 
+        app.MapGet("/GetCusomerCount", () =>
+        {
+            try
+            {
+                var result = customerService.GetCusomerCount();
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
+        });
+        app.MapGet("/GetRankCount", () =>
+        {
+            try
+            {
+                var result = customerService.GetRankCount();
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
+        });
         app.Run();
 
     }

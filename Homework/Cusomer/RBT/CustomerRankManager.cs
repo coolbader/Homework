@@ -11,13 +11,23 @@ namespace Homework
         /// </summary>
         private readonly SortedSet<CustomerData> _rankedCustomers = new SortedSet<CustomerData>(new CustomerDataComparer());
 
-        public int Count=> _rankedCustomers.Count;
+        public int Count => _rankedCustomers.Count;
+
         // 添加 CustomerData
         public void AddCustomer(CustomerData customer)
         {
             _rankedCustomers.Add(customer);
         }
-       
+
+        // 批量添加 CustomerData
+        public void AddCustomers(IEnumerable<CustomerData> customers)
+        {
+            foreach (var customer in customers)
+            {
+                _rankedCustomers.Add(customer);
+            }
+        }
+
         // 删除 CustomerData
         public bool RemoveCustomer(CustomerData customer)
         {
@@ -57,6 +67,7 @@ namespace Homework
             }
             return null;
         }
+
         /// <summary>
         /// 测试使用，获取相同的客户ID
         /// </summary>
@@ -64,6 +75,20 @@ namespace Homework
         public List<CustomerData> GetTheSame()
         {
             return _rankedCustomers.GroupBy(a => a.CustomerId).Where(a => a.Count() > 1).SelectMany(a => a).ToList();
+        }
+
+        // 批量修改 CustomerData
+        public void UpdateCustomers(IEnumerable<CustomerData> updatedCustomers)
+        {
+            foreach (var updatedCustomer in updatedCustomers)
+            {
+                var existingCustomer = _rankedCustomers.FirstOrDefault(c => c.CustomerId == updatedCustomer.CustomerId);
+                if (existingCustomer != null)
+                {
+                    _rankedCustomers.Remove(existingCustomer);
+                    _rankedCustomers.Add(updatedCustomer);
+                }
+            }
         }
     }
 

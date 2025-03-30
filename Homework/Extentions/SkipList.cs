@@ -212,5 +212,22 @@ namespace Homework
             info.AddValue("levels", _levels);
             info.AddValue("comparer", _comparer);
         }
+
+        public void BatchUpdateOrAdd(Queue<T> values)
+        {
+            if (values == null) return;
+            foreach (var value in values)
+            {
+                if (Contains(value))
+                {
+                    Remove(value);
+                    Add(value);
+                }
+                else
+                {
+                    Add(value);
+                }
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-namespace Customer;
+namespace Homework;
 
 public class CustomerData : IComparable<CustomerData>, IEquatable<CustomerData>
 {
@@ -14,7 +14,7 @@ public class CustomerData : IComparable<CustomerData>, IEquatable<CustomerData>
 
     public int CompareTo(CustomerData? other)
     {
-        //if (other == null) return 1;
+        if (other == null) return 1;
         // 先按 Score 降序，Score 相同则按 CustomerId 升序
         int scoreComparison = other.Score.CompareTo(this.Score);  // 降序
         if (scoreComparison == 0)
@@ -24,20 +24,23 @@ public class CustomerData : IComparable<CustomerData>, IEquatable<CustomerData>
         return scoreComparison;
     }
 
-    // 添加相等性比较方法
+    // 相等性方法
     public bool Equals(CustomerData? other)
     {
         if (other == null) return false;
-        return this.CustomerId == other.CustomerId;
+        return this.CustomerId == other.CustomerId ;
     }
 
     public override bool Equals(object? obj)
     {
         return obj is CustomerData other && Equals(other);
     }
-
+    /// <summary>
+    /// 比较hash
+    /// </summary>
+    /// <returns></returns>
     public override int GetHashCode()
     {
-        return CustomerId.GetHashCode();
+        return CustomerId.GetHashCode() ^ Score.GetHashCode();
     }
 }

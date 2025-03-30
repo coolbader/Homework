@@ -5,15 +5,15 @@ using System.Threading.Tasks;
 namespace Homework.Tests
 {
     [TestClass()]
-    public class CustomerObserverServiceTest
+    public class CustomerSkipListServiceTests
     {
 
-        private CustomerObsoleteService _service;
+        private CustomerSkipListService _service;
 
         [TestInitialize]
         public void Setup()
         {
-            _service = new CustomerObsoleteService();
+            _service = new CustomerSkipListService();
         }
 
         /// <summary>
@@ -54,13 +54,13 @@ namespace Homework.Tests
         public void UpdateScore_NewCustomer()
         {
             var customer = _service.UpdateScore(1, 100);
-
+           
             Assert.IsNotNull(customer);
             Assert.AreEqual(100, customer.Score);
             Assert.AreEqual(1, _service.GetCustomersByRank(1, 10).Count);
         }
 
-
+      
 
         /// <summary>
         /// Test to get customer with neighbors.
@@ -75,7 +75,7 @@ namespace Homework.Tests
             _service.UpdateScore(5, 500);
 
             var result = _service.GetCustomersAroundCustomer(3, 1, 1);
-            var getsame = _service.GetTheSame();
+
             Assert.AreEqual(3, result.Count);
             Assert.AreEqual(4, result[0].CustomerId);
             Assert.AreEqual(3, result[1].CustomerId);
@@ -84,7 +84,7 @@ namespace Homework.Tests
         }
         /// <summary>
         /// 模拟10001个客户。
-        /// total:2.9m 测试方法为指数级别增加。
+        /// 3.3m
         /// </summary>
         [TestMethod]
         public void Simulate_100001_Customer_AddData()
@@ -115,7 +115,38 @@ namespace Homework.Tests
         }
         /// <summary>
         /// 模拟10001个客户。
-        /// 2.4s 
+        /// 1.7s
+        /// </summary>
+        [TestMethod]
+        public void Simulate_10001_Customer_AddData()
+        {
+            Random random = new Random();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            int totalRequests = 10001;
+            for (int i = 0; i < totalRequests; i++)
+            {
+                int Id = i + 1;
+                int score1 = random.Next(-500,500);
+                var reslut=  _service.UpdateScore(i+1, 100);
+                if (reslut==null)
+                {
+                    Trace.WriteLine($"CustomerId:{i+1} Update Error.");
+                }
+            }
+            stopwatch.Stop();
+            Trace.WriteLine($"Total Requests: {totalRequests}");
+            Trace.WriteLine($"Time Taken: {stopwatch.ElapsedMilliseconds} ms");
+            var result = _service.GetCustomersByRank(1,50);
+            Trace.WriteLine("Customer Insert Count:"+_service.GetCustomerCount());
+            foreach (var item in result)
+            {
+                Trace.WriteLine($"cusomerid:{item.CustomerId},Score:{item.Score},Rank:{item.Rank}");
+            }
+
+        }
+        /// <summary>
+        /// 模拟10001个客户。
+        /// 3.9s
         /// </summary>
         [TestMethod]
         public void Simulate_10001_Customer_UpdateData()
@@ -148,7 +179,7 @@ namespace Homework.Tests
             Trace.WriteLine($"Time Taken: {stopwatch.ElapsedMilliseconds} ms");
             var result = _service.GetCustomersByRank(1, 50);
             Trace.WriteLine("Customer Insert Count:" + _service.GetCustomerCount());
-            Trace.WriteLine("The Same Customer:" + _service.GetTheSame().Count());
+            Trace.WriteLine("The Same Customer:"+_service.GetTheSame().Count());
             foreach (var item in result)
             {
                 Trace.WriteLine($"cusomerid:{item.CustomerId},Score:{item.Score},Rank:{item.Rank}");
@@ -156,8 +187,7 @@ namespace Homework.Tests
 
         }
         [TestMethod]
-        public void Simulate_10_Customer_Data()
-        {
+        public void Simulate_10_Customer_Data() {
             for (int i = 0; i < 10; i++)
             {
                 _service.UpdateScore(i + 1, 1);

@@ -12,19 +12,26 @@ namespace Customer;
 /// 总结：延迟重建索引，比如每隔5秒更新排行，但与需求不符。
 /// </summary>
 
-public class CustomerObsoleteService 
+public class CustomerSortedSetService 
 {
     /// <summary>
     /// 用于存储所有客户<客户ID，客户数据>
     /// </summary>
     private readonly ConcurrentDictionary<long, CustomerData> _customers = new();
 
-    private readonly CustomerRankManager _rankedCustomers = new CustomerRankManager();
+    private readonly CustomerRankManager _rankedCustomers ;
+
+    public CustomerSortedSetService(CustomerRankManager rankedCustomers)
+    {
+        _rankedCustomers = rankedCustomers;
+    }
     ///// <summary>
     ///// 排行榜缓存
     ///// </summary>
     //private List<CustomerData> _cusomerIndex = new();
     private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
+
+    
 
     public CustomerVO UpdateScore(long customerId, decimal score)
     {

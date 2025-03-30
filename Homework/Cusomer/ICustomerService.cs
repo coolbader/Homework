@@ -1,9 +1,10 @@
 ﻿using Homework;
 
-namespace Customer
+namespace Homework
 {
-    public interface ICustomerObsoleteService
+    public interface ICustomerService
     {
+      
         int GetCustomerCount();
         List<CustomerVO> GetCustomersAroundCustomer(long customerId, int high, int low);
         List<CustomerVO> GetCustomersByRank(int start, int end);

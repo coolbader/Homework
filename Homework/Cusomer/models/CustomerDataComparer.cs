@@ -9,13 +9,15 @@ namespace Homework
     {
         public int Compare(CustomerData x, CustomerData y)
         {
-            // 按照分数降序排序
+            if (x == null && y == null) return 0;
+            if (x == null) return -1;
+            if (y == null) return 1;
+
             int scoreComparison = y.Score.CompareTo(x.Score);
             if (scoreComparison != 0)
             {
                 return scoreComparison;
             }
-            // 分数相同，按 CustomerId 升序排序
             return x.CustomerId.CompareTo(y.CustomerId);
         }
     }

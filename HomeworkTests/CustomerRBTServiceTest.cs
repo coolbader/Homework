@@ -1,4 +1,6 @@
 ﻿using Customer;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
@@ -8,12 +10,12 @@ namespace Homework.Tests
     public class CustomerRBTServiceTest
     {
 
-        private CustomerObsoleteService _service;
+        private CustomerRBTService _service;
 
         [TestInitialize]
         public void Setup()
         {
-            _service = new CustomerObsoleteService();
+            _service =new CustomerRBTService();
         }
 
         /// <summary>
@@ -148,7 +150,6 @@ namespace Homework.Tests
             Trace.WriteLine($"Time Taken: {stopwatch.ElapsedMilliseconds} ms");
             var result = _service.GetCustomersByRank(1, 50);
             Trace.WriteLine("Customer Insert Count:" + _service.GetCustomerCount());
-            Trace.WriteLine("The Same Customer:" + _service.GetTheSame().Count());
             foreach (var item in result)
             {
                 Trace.WriteLine($"cusomerid:{item.CustomerId},Score:{item.Score},Rank:{item.Rank}");
