@@ -2,7 +2,16 @@ using Homework;
 using Homework.Cusomer;
 using System.Collections.Concurrent;
 namespace Customer;
-
+/// <summary>
+/// 采用字典存储客户数据，采用红黑树存储积分并排序,排名按照索引实时计算。
+/// 缺点：
+/// 1.新增红黑树数据O(1),更新红黑树先删除在新增。O（N）+O(1).
+/// 2.红黑树对分数和客户ID进行排序，建立索引链表用于排名。重建链表会消耗O（N）
+/// 3.获取索引的过程可能会消耗O（N），导致实际更新较慢。
+/// 测试：
+/// 实际测试10001条数据预计要3秒。
+/// 总结：延迟重建索引，比如每隔5秒更新排行，但与需求不符。
+/// </summary>
 [Obsolete]
 public class CustomerObsoleteService
 {
@@ -13,16 +22,12 @@ public class CustomerObsoleteService
     /// <summary>
     /// 使用红黑树用于存储客户排名,仅作为计算排名使用。
     /// 1.使用 SortedSet 是为了对客户得分进行排序。
-    /// 2.使用 CustomerDataComparer 是为了按照得分降序排序。
-    /// 3.排名索引得到排名数据，在_customers中得到实际的数据。
+    /// 2.排名索引得到排名数据，在_customers中得到实际的数据。
     /// </summary>
     private readonly SortedSet<CustomerData> _rankedCustomers = new SortedSet<CustomerData>(new CustomerDataComparer());
 
-    private readonly SortedDictionary<int,long> _rankedCustomersDic = new SortedDictionary<int, long>();
-
     private List<CustomerData> _cusomerIndex = new();
-    private readonly object _lock = new();
-
+    private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
     public CustomerData UpdateScore(long customerId, decimal score)
     {
         if (score < -1000 || score > 1000)
@@ -30,23 +35,43 @@ public class CustomerObsoleteService
             throw new ArgumentException("Score must be between -1000 and 1000");
         }
 
-        lock (_lock)
+        _rwLock.EnterUpgradeableReadLock();
+        try
         {
             if (_customers.TryGetValue(customerId, out var existingCustomer))
             {
-                existingCustomer.Score += score;
-                _customers.TryUpdate(customerId, existingCustomer, existingCustomer);
-                UpdateRanksAndRtnRank(existingCustomer);
-                return existingCustomer;
+                _rwLock.EnterReadLock();
+                try
+                {
+                    var updated = new CustomerData(customerId, existingCustomer.Score + score);
+                    if (_rankedCustomers.Remove(existingCustomer))
+                    {
+                        _rankedCustomers.Add(updated);
+                        _customers.TryUpdate(customerId, updated, existingCustomer);
+                        return updated;
+                    }
+                    return existingCustomer;
+                }
+                finally { _rwLock.ExitWriteLock(); }
             }
             else
             {
-                var newCustomer = new CustomerData(customerId, score);
-                _customers.TryAdd(customerId, newCustomer);
-                UpdateRanksAndRtnRank(newCustomer);
-                return newCustomer;
+                _rwLock.EnterReadLock();
+                try
+                {
+                    var newCustomer = new CustomerData(customerId, score);
+                    _customers.TryAdd(customerId, newCustomer);
+                    UpdateRanksAndRtnRank(newCustomer);
+                    return newCustomer;
+                }
+                finally
+                {
+
+                    _rwLock.ExitReadLock();
+                }
             }
         }
+        finally { _rwLock.ExitUpgradeableReadLock(); }
     }
     /// <summary>
     /// 1.添加新客户到排名列表
@@ -64,11 +89,12 @@ public class CustomerObsoleteService
         }
         // 添加进进去，重新计算排名
         _rankedCustomers.Add(customer);
-        _rankedCustomersDic.Add(_rankedCustomers.GetSortedSetIndex(customer) + 1, customer.CustomerId);
-        // Rank=索引+1,在取值的时候关联赋值
-        //customer.Rank = _rankedCustomers.GetSortedSetIndex(customer) + 1;
-        //重建查询索引
+        RebuildIndex();
+    }
 
+    private void RebuildIndex()
+    {
+        _cusomerIndex = _rankedCustomers.ToList();
     }
 
 
@@ -83,7 +109,8 @@ public class CustomerObsoleteService
     /// <exception cref="ArgumentException"></exception>
     public List<CustomerData> GetCustomersByRank(int start, int end)
     {
-        lock (_lock)
+        _rwLock.EnterReadLock();
+        try
         {
             if (start < 1 || end < start)
             {
@@ -102,11 +129,13 @@ public class CustomerObsoleteService
             }
             return result;
         }
+        finally { _rwLock.ExitReadLock(); }
     }
 
     public List<CustomerData> GetCustomersAroundCustomer(long customerId, int high, int low)
     {
-        lock (_lock)
+        _rwLock.EnterReadLock();
+        try
         {
             if (!_customers.TryGetValue(customerId, out var targetCustomer))
             {
@@ -139,11 +168,13 @@ public class CustomerObsoleteService
                         _cusomerIndex[highindex].Rank = _rankedCustomers.GetSortedSetIndex(_cusomerIndex[highindex]) + 1;
                         result.Add(_cusomerIndex[highindex]);
                     }
-
                 }
             }
             return result;
-        }
-    }
 
+        }
+        finally { _rwLock.ExitReadLock(); }
+    }
 }
+
+

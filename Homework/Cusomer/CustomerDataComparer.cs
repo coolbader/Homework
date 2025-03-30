@@ -5,7 +5,7 @@ using System.Reflection.Metadata.Ecma335;
 
 namespace Homework.Cusomer
 {
-    public class CustomerDataComparer : IComparer<CustomerData>
+    public class CustomerDataComparer :  IComparer<CustomerData>
     {
         public int Compare(CustomerData x, CustomerData y)
         {
@@ -15,7 +15,6 @@ namespace Homework.Cusomer
             {
                 return scoreComparison;
             }
-
             // 分数相同，按 CustomerId 升序排序
             return x.CustomerId.CompareTo(y.CustomerId);
         }

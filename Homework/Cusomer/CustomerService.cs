@@ -8,13 +8,17 @@ using System.Threading;
 namespace Customer
 {
 
+    /// <summary>
+    /// 核心思路：
+    /// 1.字典保存客户得分信息。
+    /// 2.跳表排序，跳表里Index就是排名。O(log n).
+    /// </summary>
     public class CustomerService
     {
         /// <summary>
         ///  客户数据字典
         /// </summary>
         private readonly ConcurrentDictionary<long, CustomerData> _customers = new();
-
         /// <summary>
         ///  跳表
         /// </summary>
@@ -23,64 +27,67 @@ namespace Customer
         /// <summary>
         ///  读写锁
         /// </summary>
-        private readonly ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim();
+        private static ReaderWriterLockSlim _rwLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
         private readonly object _lock = new object();
 
-        public CustomerData UpdateScore(long customerId, decimal score)
+        public CustomerVO UpdateScore(long customerId, decimal score)
         {
             if (score < -1000 || score > 1000)
             {
                 throw new ArgumentException("Score must be between -1000 and 1000");
             }
+            CustomerData resultCustomer = null;
+            int rank = 0;
+            if (_customers.TryGetValue(customerId, out var existingCustomer))
+            {
+                _rwLock.EnterUpgradeableReadLock();
+                try
+                {
+                    // 删除旧排名，修改为新排名
+                    resultCustomer = new CustomerData(customerId, existingCustomer.Score + score);
+                    _rankedCustomers.Update(existingCustomer, resultCustomer);
+                    rank = _rankedCustomers.GetIndex(resultCustomer);
+                    // 更新字典中的客户数据
+                    _customers[customerId] = resultCustomer;
+                }
+                finally { _rwLock.ExitUpgradeableReadLock(); }
+            }
+            else
+            {
+                _rwLock.EnterWriteLock();
+                try
+                {
+                    resultCustomer = new CustomerData(customerId, score);
+                    _customers.TryAdd(customerId, resultCustomer);
+                    _rankedCustomers.Add(resultCustomer);
+                    rank = _rankedCustomers.GetIndex(resultCustomer);
+                }
+                finally { _rwLock.ExitWriteLock(); }
 
-            _rwLock.EnterWriteLock();
-            try
-            {
-                if (_customers.TryGetValue(customerId, out var existingCustomer))
-                {
-                    //删除就排名
-                    _rankedCustomers.Remove(existingCustomer);
-                    existingCustomer.Score += score;
-                    // 直接插入并获取新排名
-                    _rankedCustomers.Add(existingCustomer);
-                    return existingCustomer;
-                }
-                else
-                {
-                    var newCustomer = new CustomerData(customerId, score);
-                    _customers.TryAdd(customerId, newCustomer);
-                    _rankedCustomers.Add(newCustomer);
-                    return newCustomer;
-                }
             }
-            finally
-            {
-                _rwLock.ExitWriteLock();
-            }
+            var result = new CustomerVO(resultCustomer, rank+1);
+
+            return result;
         }
 
 
-        public List<CustomerData> GetCustomersByRank(int start, int end)
+        public List<CustomerVO> GetCustomersByRank(int start, int end)
         {
             if (start < 1 || end < start)
             {
                 throw new ArgumentException("Invalid rank range");
             }
-            var result = new List<CustomerData>();
+            var result = new List<CustomerVO>();
             _rwLock.EnterReadLock();
             try
             {
-              
-
                 for (int i = start - 1; i < end && i < _customers.Count; i++)
                 {
                     var customer = _rankedCustomers.GetByIndex(i);
-                    //排名从1开始，+1
-                    customer.Rank = i + 1;
-                    result.Add(customer);
+                    var vo = new CustomerVO(customer, i + 1);
+                    result.Add(vo);
                 }
-
                 return result;
             }
             finally
@@ -90,10 +97,9 @@ namespace Customer
         }
 
 
-        public List<CustomerData> GetCustomersAroundCustomer(long customerId, int high, int low)
+        public List<CustomerVO> GetCustomersAroundCustomer(long customerId, int high, int low)
         {
-            var result = new List<CustomerData>();
-            
+            var result = new List<CustomerVO>();
             try
             {
                 // 开始读锁
@@ -110,10 +116,7 @@ namespace Customer
                 {
                     throw new InvalidOperationException($"CustomerData {customerId} not found in ranked list");
                 }
-
-                //排名从1开始，+1
-                targetCustomer.Rank = targetRankIndex + 1;
-
+                var selfcustomer = new CustomerVO(targetCustomer, targetRankIndex);
                 // 开始获取目标客户的后high个客户数据
                 if (high > 0)
                 {
@@ -123,15 +126,13 @@ namespace Customer
                         if (highIndex >= 0 && highIndex < _customers.Count)
                         {
                             var customer = _rankedCustomers.GetByIndex(highIndex);
-                            customer.Rank = highIndex + 1;
-                            result.Add(customer);
+                            var highvo = new CustomerVO(customer, highIndex + 1);
+                            result.Add(highvo);
                         }
                     }
                 }
-               
-
                 // 添加目标客户数据
-                result.Add(targetCustomer);
+                result.Add(selfcustomer);
 
                 // 开始获取目标客户的前low个和后high个客户数据
                 if (low > 0)
@@ -142,9 +143,8 @@ namespace Customer
                         if (lowIndex >= 0 && lowIndex < _customers.Count)
                         {
                             var customer = _rankedCustomers.GetByIndex(lowIndex);
-                            //排名从1开始，+1
-                            customer.Rank = lowIndex + 1;
-                            result.Add(customer);
+                            var lowvo = new CustomerVO(customer, lowIndex + 1);
+                            result.Add(lowvo);
                         }
                     }
                 }
@@ -156,7 +156,6 @@ namespace Customer
                 if (_rwLock.IsReadLockHeld)
                     _rwLock.ExitReadLock();
             }
-
             return result;
         }
 
@@ -170,7 +169,14 @@ namespace Customer
 
         public int GetCustomerCount()
         {
-            return _rankedCustomers.Count;
+            return _rankedCustomers.Count();
+        }
+
+        public List<CustomerData> GetTheSame()
+        {
+           return _rankedCustomers.GroupBy(a=>a.CustomerId) .Where(g => g.Count() > 1)
+           .SelectMany(g => g).ToList();
+
         }
     }
 }
