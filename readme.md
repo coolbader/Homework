@@ -23,6 +23,8 @@
 
 ``
 #### 备注：所有interface接口无实际作用，仅为统一算法。
+# 增加各算法十万测试
 
 # 测试截图：
+
 <img src="https://github.com/coolbader/Homework/blob/master/%E6%B5%8B%E8%AF%95%E6%88%AA%E5%9B%BE.png" />
